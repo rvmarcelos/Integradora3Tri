@@ -7,10 +7,7 @@ library(ggplot2)
 
 ## TO DOs -----
 
-# Mudar colunas "review_creation_date" e "review_answer_timestamp" para formato date time
-
-
-
+# contar NA
 
 ## Import e Join Base de dados-----
 #Lendo
@@ -60,12 +57,6 @@ df_olist %>% select(where(is.integer)) %>% glimpse()
 
 ## Limpeza da tabela-----
 
-#olhar colunas order item id <- sequential number identifying number of items included in the same order.
-
-#order item contem a informação de quanto itens por pedido
-
-df_olist %>% count(order_item_id)
-
 # Tirando as colunas de identificação uma vez que foram juntadas e renomeando colunas order item id para number_order:
 
 df_no_id <- df_olist %>% select(!ends_with("id")) %>% mutate(number_order = df_olist$order_item_id)
@@ -101,8 +92,7 @@ df_review <- df_delay %>% mutate(review_high = ifelse(df_olist$review_score>=4, 
 ## Criar variável tamanho do produto pois é mais relevante q ter três medidas (comprimento, altura e largura)
 
 df_dim <- df_review %>% select(!ends_with("cm")) %>%
-  mutate(product_dimensions_cm = df_olist$product_height_cm * df_olist$product_length_cm * df_olist$product_width_cm) %>%
-  glimpse()
+  mutate(product_dimensions_cm = df_olist$product_height_cm * df_olist$product_length_cm * df_olist$product_width_cm) 
 
 ## Criar variável estado do vendedor é o mesmo do comprador
 
@@ -115,7 +105,7 @@ df_ae %>% glimpse()
 ## Analise Exploratória -----
 # Variaveis categorica:
 
-df_ae %>% count(product_category_name) %>% arrange(desc(n)) %>% head()
+df_ae %>% count(product_category_name) %>% arrange(desc(n)) 
 
 col_cat <- df_ae %>%
   select(where(is.character)) %>%
