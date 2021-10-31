@@ -7,7 +7,7 @@ library(ggplot2)
 
 ## TO DOs -----
 
-# contar NA
+# contar / tratar NAs
 
 ## Import e Join Base de dados-----
 #Lendo
@@ -75,10 +75,6 @@ df_date <- df_no_id %>%
   select(!ends_with("date")) %>%
   select(!ends_with("timestamp")) %>%
   select(!order_approved_at)
-
-# Processamento de dados
-
-
 
 ## Estimativa de dias de atraso e tempo decorrico
 
@@ -153,7 +149,13 @@ graficos_con <- Map(fazer_graf_con, col_con)
 
 ## Fazer uma matrix de correlação ("this is fine :,)")
 
-cor(df_ae %>% select(where(is.numeric)))
+cor(df_ae %>% select(where(is.numeric)) %>% filter(is.na()))
 
+df_ae %>% filter(is.na(review_score)) %>% count(review_score)
+
+df_ae %>% count(review_score)
+
+teste <- replace(NA, df_ae$review_score, mean(df_ae$review_score, na.rm = TRUE))
+df_semna <- replace
 ## Processamento de dados  -----
 
