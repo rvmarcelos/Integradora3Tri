@@ -4,10 +4,13 @@ library(dplyr)
 library(lubridate)
 library(recipes)
 library(ggplot2)
+library(purrr)
+library(tidyr)
+library(corrplot)
 
 ## TO DOs -----
 
-# contar / tratar NAs
+# contar / tratar NAs nas colunas de tempo
 
 ## Import e Join Base de dados-----
 #Lendo
@@ -81,27 +84,28 @@ df_date <- df_no_id %>%
 df_delay <- df_date %>% mutate(delay_time = df_date$day_estimated - df_date$day_delivered_customer) %>%
   mutate(delivery_time = df_date$day_delivered_customer -  df_date$day_purchase)
 
-## Criar variável de alaviação alta ou baixa (1 e 0) para visualizar correlação de notas altas e outras variáveis
+## Criar variável de alaviação alta ou baixa (high e low) para visualizar correlação de notas altas e outras variáveis
 
 df_review <- df_delay %>% mutate(review_high = ifelse(df_olist$review_score>=4, "high", "low"))
 
 ## Criar variável tamanho do produto pois é mais relevante q ter três medidas (comprimento, altura e largura)
 
 df_dim <- df_review %>% select(!ends_with("cm")) %>%
-  mutate(product_dimensions_cm = df_olist$product_height_cm * df_olist$product_length_cm * df_olist$product_width_cm) 
+  mutate(product_dimensions_cm = df_olist$product_height_cm * df_olist$product_length_cm * df_olist$product_width_cm)
+
+## Substituir NA values por moda
+
+df_NA_chr <- df_dim %>% mutate(across(where(is.character),~replace_na(.x, max(.x , na.rm = TRUE))))
+
+df_NA_numeric <- df_NA_chr %>% mutate(across(where(is.numeric),~replace_na(.x, mean(.x , na.rm = TRUE))))
 
 ## Criar variável estado do vendedor é o mesmo do comprador
 
-df_ae <- df_dim %>% mutate(same_estate_cs = ifelse(df_olist$customer_state == df_olist$seller_state, 1, 0))
-
-## Ver como ficou
-
-df_ae %>% glimpse()
-
+df_ae <- df_NA_numeric %>% mutate(same_estate_cs = ifelse(df_olist$customer_state == df_olist$seller_state, 1, 0))
 ## Analise Exploratória -----
 # Variaveis categorica:
 
-df_ae %>% count(product_category_name) %>% arrange(desc(n)) 
+df_ae %>% count(delivery_time) %>% arrange(desc(n))
 
 col_cat <- df_ae %>%
   select(where(is.character)) %>%
@@ -123,9 +127,9 @@ fazer_list_cat <- function(x){
   df_ae %>% count(.data[[x]]) %>% arrange(desc(n)) %>% head()
 }
 
-graficos_cat <- Map(fazer_graf_cat, col_cat)
+graficos_cat <- map(col_cat, fazer_graf_cat)
 
-summarise_cat <- Map(fazer_list_cat, col_cat)
+summarise_cat <- map(col_cat,fazer_list_cat )
 
 # patchwork::wrap_plots(graficos_cat) obs. pode ser util
 
@@ -135,9 +139,11 @@ col_con <- df_ae %>% select(where(is.numeric)) %>% colnames()# tirar colunas q n
 
 
 df_ae %>%
-  ggplot(aes(freight_value, fill = review_high)) +
-  geom_histogram()+
-  scale_x_log10()
+  ggplot(aes(delay_time, colours = review_high)) +
+  geom_freqpoly()
+
+
+
 
 fazer_graf_con <- function(x){
   df_ae %>%
@@ -145,17 +151,22 @@ fazer_graf_con <- function(x){
     geom_histogram()
 
 }
-graficos_con <- Map(fazer_graf_con, col_con)
+graficos_con <- map(col_con, fazer_graf_con)
+
+summarise_cat <- map(col_con,fazer_list_cat )
 
 ## Fazer uma matrix de correlação ("this is fine :,)")
 
-cor(df_ae %>% select(where(is.numeric)) %>% filter(is.na()))
+correlacao <- cor(df_ae %>% select(where(is.numeric)))
 
-df_ae %>% filter(is.na(review_score)) %>% count(review_score)
+corrplot(correlacao, method = 'color', order = 'alphabet')
+
+df_ae %>% filter(!is.na(review_score)) %>% count(review_score)
 
 df_ae %>% count(review_score)
 
 teste <- replace(NA, df_ae$review_score, mean(df_ae$review_score, na.rm = TRUE))
 df_semna <- replace
+
 ## Processamento de dados  -----
 
