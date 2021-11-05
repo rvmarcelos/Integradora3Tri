@@ -10,11 +10,11 @@ library(corrplot)
 
 ## TO DOs -----
 
-# Analise Kmeans
+# Analise Kmeans ok
 
-# Melhorar matrix correlaÃ§Ã£o
+# Melhorar matrix correlaÃ§Ã£o...
 
-# Fazer Boxplots e outros grÃ¡ficos pertinentes
+# Fazer Boxplots e outros grÃ¡ficos pertinentes...
 
 
 # Tratar outliers
@@ -41,6 +41,8 @@ item <- read.csv('olist_order_items_dataset.csv')
 geolocalization <- read.csv('olist_geolocation_dataset.csv')
 
 customers <- read.csv('olist_customers_dataset.csv')
+
+br <- sf::read_sf("C:/Users/Marcelo/Desktop/insper/geodata-br-master/geojson/geojs-100-mun.json")
 
 # Tentativa de fazer rÃ¡pido, olhar depois
 # head(sellers)
@@ -99,7 +101,7 @@ df_NA_numeric <- df_NA_chr %>% mutate(across(where(is.numeric),~replace_na(.x, m
 
 ## Estimativa de dias de atraso e tempo decorrico
 
-df_delay <- df_NA_numeric %>% mutate(delay_time = as.numeric(df_NA_numeric$day_estimated - df_NA_numeric$day_delivered_customer)) %>%
+df_delay <- df_NA_numeric %>% mutate(delay_time = as.numeric( day_delivered_customer - day_estimated )) %>%
   mutate(delivery_time = as.numeric(df_NA_numeric$day_delivered_customer -  df_NA_numeric$day_purchase))
 
 ## Criar variÃ¡vel de alaviaÃ§Ã£o alta ou baixa (high e low) para visualizar correlaÃ§Ã£o de notas altas e outras variÃ¡veis
@@ -126,9 +128,35 @@ Receita <- recipe(review_high ~ ., data = df_ae) %>%
 preparado <- prep(Receita, df_ae)
 df_dummy <- bake(preparado, new_data = NULL)
 
+## GeoLocalizacao:
 
 
-## VisualizaÃ§Ã£o pÃ³s tratamento
+# Guardei isso pq mostra raciocínio de como resolver
+# left_join(x = df_ae, y = geolocalization %>% distinct_all(), 
+#           by = c('seller_zip_code_prefix' = 'geolocation_zip_code_prefix', 
+#                  'seller_city' = "geolocation_city",
+#                  "seller_state" = "geolocation_state")) %>% glimpse()
+
+
+df_mega_foda <- df_ae %>%
+  left_join(geolocalization %>% group_by(geolocation_zip_code_prefix) %>% 
+              summarise(geo_lat = max(geolocation_lat),
+                        geo_lng = max(geolocation_lng)),
+            by = c('seller_zip_code_prefix' = 'geolocation_zip_code_prefix')) %>%
+  mutate(seller_lat = geo_lat,
+         seller_lgn = geo_lng) %>% 
+  select(!starts_with('geo')) %>% 
+  left_join(geolocalization %>% group_by(geolocation_zip_code_prefix) %>% 
+              summarise(geo_lat = max(geolocation_lat),
+                        geo_lng = max(geolocation_lng)),
+            by = c('customer_zip_code_prefix' = 'geolocation_zip_code_prefix')) %>%
+  mutate(customer_lat = geo_lat,
+         customer_lgn = geo_lng) %>% 
+  select(!starts_with('geo'))
+
+
+
+ # VisualizaÃ§Ã£o pÃ³s tratamento
 
 #df_NA_chr %>% glimpse()
 
@@ -189,7 +217,7 @@ summarise_cat <- map(col_con,fazer_list_cat )
 
 ## Fazer uma matrix de correlaÃ§Ã£o ("this is fine :,)")----
 
-correlacao <- cor(df_dummy %>% select(where(is.numeric)))
+correlacao <- cor(df_ae %>% select(where(is.numeric)))
 
 corrplot(correlacao, method = 'color', order = 'alphabet')
 
@@ -197,19 +225,61 @@ df_ae %>% filter(!is.na(review_score)) %>% count(review_score)
 
 df_ae %>% count(review_score)
 
-teste <- replace(NA, df_ae$review_score, mean(df_ae$review_score, na.rm = TRUE))
-df_semna <- replace
+# teste <- replace(NA, df_ae$review_score, mean(df_ae$review_score, na.rm = TRUE))
+# df_semna <- replace
 
 ## Analise dos Sellers e Customers  -----
 
 #Sellers:
 
-df_ae %>% group_by(seller_zip_code_prefix) %>%
-  summarise(Media_atraso = mean(delay_time)) %>%
-  arrange(Media_atraso)
+df_ae %>% drop_na()%>%
+  group_by(seller_zip_code_prefix) %>%
+  summarise(Media_atraso = mean(delay_time),
+            ticket_medio = mean(price),
+            vendas_total = sum(payment_value),
+            estado = max(seller_state)) %>%
+  arrange(desc(vendas_total)) 
+
+
+
 
 df_ae %>% count(seller_state) %>%
-  arrange(desc(n))
+  arrange(desc(n)) %>% head()
+
+df_ae %>% count(product_category_name) %>% 
+  arrange(desc(n)) %>% head()
+
+## Plot em mapa: ----
+
+df_mega_foda %>% 
+  ggplot(aes(payment_type))+
+  geom_bar()
+
+df_mega_foda %>% 
+  ggplot()+
+  geom_bar(aes(payment_type))
+
+
+df_mega_foda %>% 
+  ggplot()+
+  geom_point(aes(seller_lgn, seller_lat))
+
+
+
+gg_pontos_com_mapa <- br %>%
+  ggplot() +
+  geom_sf(colour = "black", size = .1) +
+  geom_point(
+    aes(seller_lgn, seller_lat),
+    data = df_mega_foda,
+    alpha = .7
+  )
+
+
+gg_pontos_com_mapa
+
+
+
 
 ## Kmeans ----
 
@@ -218,5 +288,10 @@ df_ae  %>% skimr::skim()
 
 analisek <- kmeans(df_dummy %>% drop_na() %>% select(!starts_with("day")), centers = 4)
 
-df_ae %>% mutate(cluster = analisek$cluster)
+df_cluster <- df_ae %>% drop_na() %>% mutate(cluster = analisek$cluster)
 
+df_cluster %>% group_by(cluster) %>% 
+  summarise(delay = mean(delay_time),
+            ticket_medio = mean(payment_value),
+            review = mean(review_score),
+            mesmo_UF = mean(same_estate_cs))
