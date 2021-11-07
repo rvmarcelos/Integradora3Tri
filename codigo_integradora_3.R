@@ -16,6 +16,12 @@ library(corrplot)
 
 # Fazer Boxplots e outros grÃ¡ficos pertinentes...
 
+# Analise da distancia comprador e vendedor (usar lat lng)
+
+# Olhar se é possível ver o tempo entre pedidos
+
+#normalizar dados para kmeans!!!
+
 
 # Tratar outliers
 
@@ -42,7 +48,9 @@ geolocalization <- read.csv('olist_geolocation_dataset.csv')
 
 customers <- read.csv('olist_customers_dataset.csv')
 
-br <- sf::read_sf("C:/Users/Marcelo/Desktop/insper/geodata-br-master/geojson/geojs-100-mun.json")
+br <- sf::read_sf("C:/Users/USER/Desktop/Projetos_GitHub/geodata-br-master/geojson/geojs-100-mun.json")
+
+sp <- sf::read_sf("C:/Users/USER/Desktop/Projetos_GitHub/geodata-br-master/geojson/geojs-35-mun.json")
 
 # Tentativa de fazer rÃ¡pido, olhar depois
 # head(sellers)
@@ -162,7 +170,7 @@ df_mega_foda <- df_ae %>%
 
 df_ae %>% skimr::skim()
 
-## Analise ExploratÃ³ria -----
+## Analise Exploratoria Grafico -----
 # Variaveis categorica:
 
 df_ae %>% count(delivery_time) %>% arrange(desc(n))
@@ -175,7 +183,7 @@ col_cat <- df_ae %>%
 
 df_ae %>%
   ggplot(aes(payment_type, fill = review_high)) +
-  geom_bar(position = 'dodge')
+  geom_bar(position = 'fill')
 
 fazer_graf_cat <- function(x){
   df_ae %>%
@@ -202,8 +210,13 @@ df_ae %>%
   ggplot(aes(delay_time, colours = review_high)) +
   geom_freqpoly()
 
+df_ae %>% 
+  ggplot(aes(factor(review_score), delay_time))+
+  geom_boxplot()
 
 
+df_ae %>% ggplot(aes(number_order))+
+  geom_histogram()
 
 fazer_graf_con <- function(x){
   df_ae %>%
@@ -217,7 +230,7 @@ summarise_cat <- map(col_con,fazer_list_cat )
 
 ## Fazer uma matrix de correlaÃ§Ã£o ("this is fine :,)")----
 
-correlacao <- cor(df_ae %>% select(where(is.numeric)))
+correlacao <- cor(df_ae %>% select(where(is.numeric)) %>% filter(!is.na(delay_time)))
 
 corrplot(correlacao, method = 'color', order = 'alphabet')
 
@@ -237,17 +250,22 @@ df_ae %>% drop_na()%>%
   summarise(Media_atraso = mean(delay_time),
             ticket_medio = mean(price),
             vendas_total = sum(payment_value),
-            estado = max(seller_state)) %>%
-  arrange(desc(vendas_total)) 
+            estado = max(seller_state),
+            review = mean(review_score),
+            produto_mais_vendido = max(product_category_name)) %>%
+  arrange(desc(vendas_total))
 
-
-
+mean(df_ae$review_score)
 
 df_ae %>% count(seller_state) %>%
   arrange(desc(n)) %>% head()
 
 df_ae %>% count(product_category_name) %>% 
   arrange(desc(n)) %>% head()
+
+# Customer:
+
+df_ae %>% count(customer_zip_code_prefix) %>% arrange(desc(n)) %>% head()
 
 ## Plot em mapa: ----
 
@@ -266,29 +284,71 @@ df_mega_foda %>%
 
 
 
-gg_pontos_com_mapa <- br %>%
+mapa_import <- br %>%
+  ggplot() +
+  geom_sf(colour = "black", size = .1) +
+  geom_point(
+    aes(x = customer_lgn,
+        y = customer_lat,
+        colour = factor(atrasou)),
+    data = df_mega_foda %>% mutate(atrasou = ifelse(delay_time >=0,1,0)),
+    alpha = .2,
+    size = 1
+  )
+
+mapa_import
+
+mapa_sp_seller <- sp %>%
   ggplot() +
   geom_sf(colour = "black", size = .1) +
   geom_point(
     aes(seller_lgn, seller_lat),
-    data = df_mega_foda,
+    colour = "green",
+    data = df_mega_foda %>% filter(seller_state == "SP"),
     alpha = .7
   )
 
+mapa_sp_seller
 
-gg_pontos_com_mapa
 
 
+
+mapa_br_customer <- br %>%
+  ggplot() +
+  geom_sf(colour = "black", size = .1) +
+  geom_point(
+    aes(customer_lgn, customer_lat),
+    colour = "red",
+    data = df_mega_foda %>% filter(customer_lat<=20),
+    alpha = .7
+  )
+
+mapa_sp_customer <- sp %>%
+  ggplot() +
+  geom_sf(colour = "black", size = .1) +
+  geom_point(
+    aes(customer_lgn, customer_lat),
+    colour = "red",
+    data = df_mega_foda %>% filter(customer_state == "SP"),
+    alpha = .7
+  )
+df_mega_foda %>% count(seller_lat) %>% arrange(desc(n))
+
+
+mapa_br_customer
+mapa_sp_customer
 
 
 ## Kmeans ----
 
 df_dummy %>% skimr::skim()
-df_ae  %>% skimr::skim()
+df_cluster  %>% skimr::skim()
 
 analisek <- kmeans(df_dummy %>% drop_na() %>% select(!starts_with("day")), centers = 4)
 
 df_cluster <- df_ae %>% drop_na() %>% mutate(cluster = analisek$cluster)
+
+df_cluster %>% glimpse()
 
 df_cluster %>% group_by(cluster) %>% 
   summarise(delay = mean(delay_time),
