@@ -1,5 +1,7 @@
 ## Analise da Base
 
+
+
 library(dplyr)
 library(lubridate)
 library(recipes)
@@ -7,6 +9,10 @@ library(ggplot2)
 library(purrr)
 library(tidyr)
 library(corrplot)
+library(ggridges)
+library(hrbrthemes)
+library(viridis)
+
 
 ## TO DOs -----
 
@@ -105,7 +111,7 @@ df_ae <- df_olist %>%
   # Distancia Seller e Customer
   mutate(distance = sqrt((customer_lat - seller_lat)^2+(customer_lng - seller_lng)^2))%>% 
   #mesmo estado
-  mutate(same_estate_cs = ifelse(df_dim$customer_state == df_dim$seller_state, 1, 0))%>%
+  mutate(same_estate_cs = ifelse(customer_state == seller_state, 1, 0))%>%
   # Dias de atraso
   mutate(delay_total_time = as.numeric( day_delivered_customer - day_estimated )) %>%
   # Tempo decorrido total
@@ -116,18 +122,26 @@ df_ae <- df_olist %>%
   mutate(delay_expectation_time = as.numeric(day_delivered_customer - (day_purchase + 10))) %>% 
   #Dias de atraso pela espectativa do cliente 2 (usando distância) (problema com fim de semana)
   mutate(delay_expectation_time_2 = as.numeric(day_delivered_customer - (day_purchase + 12 - 7*same_estate_cs))) %>% 
+  #Variavel tempo de resposta
+  mutate(answer_review_time = as.numeric(day_answer_review - day_review_creation)) %>% 
   # Variavel de visualizacao review high or low
-  mutate(review_high = ifelse(df_delay$review_score>=4, "high", "low"))%>% 
+  mutate(review_high = ifelse(review_score>=4, "high", "low"))%>% 
   #Criar variavel dimensao
-  mutate(product_dimensions_cm3 = df_review$product_height_cm * df_review$product_length_cm * df_review$product_width_cm) %>% 
+  mutate(product_dimensions_cm3 = product_height_cm * product_length_cm * product_width_cm) %>% 
   select(!ends_with("cm"))%>%
   #Tratando NA de categorica com valor mais frequente
   mutate(across(where(is.character) & !starts_with("review"),~replace_na(.x, max(.x , na.rm = TRUE)))) %>% 
   # Tratando NA de continuas com media
   mutate(across(where(is.numeric),~replace_na(.x, mean(.x , na.rm = TRUE))))
 
-df_ae%>% skimr::skim()
 
+sd(df_ae$delivery_time)
+
+df_ae %>% group_by(product_category_name) %>% 
+  summarise(tempo_entrega = mean(delivery_time),
+            review = mean(review_score)) %>% 
+  mutate(count(product_category_name))
+  arrange(desc(review))
 
 ## Substituir NA values por moda e mÃ©dia
 
@@ -209,24 +223,29 @@ df_ae%>% skimr::skim()
 # df_map_plot <- df_lat_lng%>% 
 #   mutate(distance = sqrt((customer_lat - seller_lat)^2+(customer_lng - seller_lng)^2)) 
 
-## Recipes Dummy, normalização -----
+## Recipes: Dummy, normalização -----
 
 
 Receita <- recipe(review_high ~ ., data = df_ae) %>%
-  step_select(-starts_with("review_comment"), -ends_with("city", "lat", "lng")) %>%
+  step_select(-ends_with("id"),
+             # -payment_type,
+              -review_comment_title,
+              -review_comment_message, 
+             # -product_category_name,
+              - customer_city,
+             # - customer_state,
+              - seller_city,
+              - seller_state,
+              - starts_with('day')) %>% 
   step_normalize(all_numeric_predictors()) %>%
-  step_dummy(all_nominal())
+  step_dummy(all_nominal_predictors())
 
 
 preparado <- prep(Receita, df_ae)
 df_receita <- bake(preparado, new_data = NULL)
 
 
-# VisualizaÃ§Ã£o pÃ³s tratamento
 
-#df_NA_chr %>% glimpse()
-
-df_ae %>% skimr::skim()
 
 ## Analise Exploratoria Grafico -----
 # Variaveis categorica:
@@ -286,15 +305,19 @@ graficos_con <- map(col_con, fazer_graf_con)
 
 summarise_cat <- map(col_con,fazer_list_cat )
 
-## Fazer uma matrix de correlaÃ§Ã£o ("this is fine :,)")----
+## Fazer uma matrix de correlacao ("this is fine :,)")----
 
-correlacao <- cor(df_map_plot %>% select(where(is.numeric)) %>% filter(!is.na(delay_time)) %>% filter(!is.na(distance)))
+correlacao <- cor(df_receita %>% select(where(is.numeric)))
 
 corrplot(correlacao, method = 'color', order = 'alphabet')
 
+correlacao[review_score]
+
 df_ae %>% filter(!is.na(review_score)) %>% count(review_score)
 
-df_ae %>% count(review_score)
+df_ae %>% count(answer_review_time) %>% arrange() %>% head()
+
+df_ae %>% count(delivery_time) %>% arrange()
 
 # teste <- replace(NA, df_ae$review_score, mean(df_ae$review_score, na.rm = TRUE))
 # df_semna <- replace
@@ -386,12 +409,12 @@ mapa_sp_customer
 
 ## Kmeans ----
 
-df_dummy %>% skimr::skim()
-df_cluster  %>% skimr::skim()
+df_receita %>% skimr::skim()
+df_ae  %>% skimr::skim()
 
-analisek <- kmeans(df_dummy %>% drop_na() %>% select(!starts_with("day")), centers = 4)
+analisek <- kmeans(df_receita  %>% select(!review_high), centers = 4)
 
-df_cluster <- df_ae %>% drop_na() %>% mutate(cluster = analisek$cluster)
+df_cluster <- df_ae %>% mutate(cluster = analisek$cluster)
 
 df_cluster %>% glimpse()
 
@@ -400,3 +423,20 @@ df_cluster %>% group_by(cluster) %>%
             ticket_medio = mean(payment_value),
             review = mean(review_score),
             mesmo_UF = mean(same_estate_cs))
+
+## Entrega parcial: Analise Distancia ----
+
+df_ae %>% filter(!between(review_score,4.01,4.9)) %>% ggplot(aes(x = delay_expectation_time_2, y = review_score, fill = as.factor(review_score))) +
+  geom_density_ridges() +
+  theme_ridges() + 
+  theme(legend.position = "none")
+
+df_ae %>% filter(!between(review_score,4.01,4.9)) %>% ggplot(aes(x = distance, y = review_score, fill = as.factor(review_score))) +
+  geom_density_ridges() +
+  theme_ridges() + 
+  theme(legend.position = "none")
+
+
+df_ae %>% filter(!between(review_score,4.01,4.9))%>% count(review_score)
+
+
