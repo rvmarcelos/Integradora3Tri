@@ -12,6 +12,7 @@ library(corrplot)
 library(ggridges)
 library(hrbrthemes)
 library(viridis)
+library(geosphere)
 
 
 ## TO DOs -----
@@ -134,15 +135,12 @@ df_ae <- df_olist %>%
   # Tratando NA de continuas com media
   mutate(across(where(is.numeric),~replace_na(.x, mean(.x , na.rm = TRUE))))
 
+# Distancia dois
+mutate(distance =  distm(c(customer_lng, customer_lat), c(seller_lng, seller_lat), fun = distHaversine)) %>%
+  glimpse()
 
-sd(df_ae$delivery_time)
-
-df_ae %>% group_by(product_category_name) %>% 
-  summarise(tempo_entrega = mean(delivery_time),
-            review = mean(review_score)) %>% 
-  mutate(count(product_category_name))
-  arrange(desc(review))
-
+lat_lng <- distm(c(df_ae$customer_lng, df_ae$customer_lat), c(df_ae$seller_lng, df_ae$seller_lat), fun = distHaversine)  
+  
 ## Substituir NA values por moda e mÃ©dia
 
 # df_NA_chr <- df_date %>%
@@ -228,12 +226,12 @@ df_ae %>% group_by(product_category_name) %>%
 
 Receita <- recipe(review_high ~ ., data = df_ae) %>%
   step_select(-ends_with("id"),
-             # -payment_type,
+              -payment_type,
               -review_comment_title,
               -review_comment_message, 
-             # -product_category_name,
+              -product_category_name,
               - customer_city,
-             # - customer_state,
+              - customer_state,
               - seller_city,
               - seller_state,
               - starts_with('day')) %>% 
@@ -311,7 +309,7 @@ correlacao <- cor(df_receita %>% select(where(is.numeric)))
 
 corrplot(correlacao, method = 'color', order = 'alphabet')
 
-correlacao[review_score]
+
 
 df_ae %>% filter(!is.na(review_score)) %>% count(review_score)
 
@@ -424,18 +422,57 @@ df_cluster %>% group_by(cluster) %>%
             review = mean(review_score),
             mesmo_UF = mean(same_estate_cs))
 
-## Entrega parcial: Analise Distancia ----
+## Entrega parcial:  ----
 
-df_ae %>% filter(!between(review_score,4.01,4.9)) %>% ggplot(aes(x = delay_expectation_time_2, y = review_score, fill = as.factor(review_score))) +
-  geom_density_ridges() +
-  theme_ridges() + 
-  theme(legend.position = "none")
+# Analises Review e Atraso: 
 
-df_ae %>% filter(!between(review_score,4.01,4.9)) %>% ggplot(aes(x = distance, y = review_score, fill = as.factor(review_score))) +
-  geom_density_ridges() +
-  theme_ridges() + 
-  theme(legend.position = "none")
 
+# Atraso e Review
+
+df_ae %>% filter(!between(review_score,4.01,4.9)) %>% 
+  ggplot(aes(x = delay_expectation_time_2,
+             y = review_score, 
+             fill = as.factor(review_score))) +
+  geom_density_ridges(alpha=0.6) + 
+  theme(legend.position = "none")+
+  scale_x_continuous(limits = c(0,50))+
+  scale_y_discrete(limits = c(1,5))+
+  labs(x = "Atraso do Produto",
+       y = "Review",
+       title = "Análise do review pelo atraso",
+       subtitle = "Atrasos maiores levam à review piores",
+       caption = "Em dias")+
+  theme_classic()+
+  theme(legend.position = "none")+
+  geom_vline(xintercept = mean(df_ae$delay_expectation_time_2),
+             color = "gray",
+             size = 1.5,
+             linetype = 2)
+  
+
+
+
+
+
+# Distancia por tempo de atraso
+
+df_ae %>% 
+  ggplot(aes(x=distance, y=delay_expectation_time)) + 
+  geom_point( color="#69b3a2") +
+  geom_smooth(method=lm , color="red", se=FALSE) +
+  scale_y_continuous(limits = c(0,100))+
+  scale_x_continuous(limits = c(0,40))+
+  theme_ipsum()+
+  labs(x = "Distancia Customer e Seller",
+       y = "Atraso",
+       title = "Atraso pela distância",
+       subtitle = "Distância não tem relação com atraso",
+       caption = "Em dias")+
+  theme_classic()
+  
+mean(df_ae$delay_expectation_time)
+
+mean(df_ae$distance)
 
 df_ae %>% filter(!between(review_score,4.01,4.9))%>% count(review_score)
 
