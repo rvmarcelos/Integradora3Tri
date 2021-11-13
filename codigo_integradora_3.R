@@ -229,7 +229,7 @@ Receita <- recipe(review_high ~ ., data = df_ae) %>%
               -payment_type,
               -review_comment_title,
               -review_comment_message, 
-              -product_category_name,
+              #-product_category_name,
               - customer_city,
               - customer_state,
               - seller_city,
@@ -431,12 +431,13 @@ df_cluster %>% group_by(cluster) %>%
 
 df_ae %>% filter(!between(review_score,4.01,4.9)) %>% 
   ggplot(aes(x = delay_expectation_time_2,
-             y = review_score, 
+             y = factor(review_score), 
              fill = as.factor(review_score))) +
-  geom_density_ridges(alpha=0.6) + 
+  geom_density_ridges(alpha=0.6,
+                      quantile_lines = TRUE, quantiles = 2) + 
   theme(legend.position = "none")+
   scale_x_continuous(limits = c(0,50))+
-  scale_y_discrete(limits = c(1,5))+
+  #scale_y_discrete(limits = c(1,5))+
   labs(x = "Atraso do Produto",
        y = "Review",
        title = "Análise do review pelo atraso",
@@ -447,19 +448,21 @@ df_ae %>% filter(!between(review_score,4.01,4.9)) %>%
   geom_vline(xintercept = mean(df_ae$delay_expectation_time_2),
              color = "gray",
              size = 1.5,
-             linetype = 2)
+             linetype = 2)+
+  scale_fill_brewer(palette = 'BrBG')
   
 
 
 
 
-
+df_ae$review
 # Distancia por tempo de atraso
 
-df_ae %>% 
+df_ae %>% filter(!between(review_score,4.01,4.9))%>% 
   ggplot(aes(x=distance, y=delay_expectation_time)) + 
-  geom_point( color="#69b3a2") +
-  geom_smooth(method=lm , color="red", se=FALSE) +
+  geom_point( aes(color=review_high)) +
+  #geom_point( color="#69b3a2") +
+  geom_smooth(method=lm, se=FALSE) +
   scale_y_continuous(limits = c(0,100))+
   scale_x_continuous(limits = c(0,40))+
   theme_ipsum()+
@@ -467,7 +470,8 @@ df_ae %>%
        y = "Atraso",
        title = "Atraso pela distância",
        subtitle = "Distância não tem relação com atraso",
-       caption = "Em dias")+
+       caption = "Em dias",
+       color = "Review")+
   theme_classic()
   
 mean(df_ae$delay_expectation_time)
@@ -476,4 +480,23 @@ mean(df_ae$distance)
 
 df_ae %>% filter(!between(review_score,4.01,4.9))%>% count(review_score)
 
+# Categoria de produto e review
+
+df_receita %>% glimpse()
+
+cor_cat_review <- df_receita %>%
+  select(ends_with(teste), review_score) %>%
+  rename_with(~ tolower(gsub("product_category_name_", "p_", .x, fixed = TRUE))) %>% 
+  cor()
+
+corrplot(cor_cat_review, method = 'color', order = 'alphabet')
+
+nome <- df_ae %>% count(product_category_name) %>% arrange(desc(n))
+nome2 <- nome %>% filter(n>=2000)
+teste <- c(nome2$product_category_name)
+
+df_ae %>%
+  filter()
+  ggplot(aes(product_category_name, fill = review_high)) +
+  geom_bar(position = 'dodge')
 
