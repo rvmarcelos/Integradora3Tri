@@ -305,11 +305,11 @@ summarise_cat <- map(col_con,fazer_list_cat )
 
 ## Fazer uma matrix de correlacao ("this is fine :,)")----
 
-correlacao <- cor(df_receita %>% select(where(is.numeric)))
+correlacao <- cor(df_ae %>% select(where(is.numeric)))
 
 corrplot(correlacao, method = 'color', order = 'alphabet')
 
-
+df_ae$product_name_lenght
 
 df_ae %>% filter(!is.na(review_score)) %>% count(review_score)
 
@@ -449,7 +449,9 @@ df_ae %>% filter(!between(review_score,4.01,4.9)) %>%
              color = "gray",
              size = 1.5,
              linetype = 2)+
-  scale_fill_brewer(palette = 'BrBG')
+  scale_fill_brewer(palette = 'BrBG')+
+  annotate(geom = "text", x = 8, y = 6.5, label = "média atraso geral", color = "gray")+
+  annotate(geom = "text", x = 11, y = .9, label = "mediana atraso grupo")
   
 
 
@@ -460,9 +462,9 @@ df_ae$review
 
 df_ae %>% filter(!between(review_score,4.01,4.9))%>% 
   ggplot(aes(x=distance, y=delay_expectation_time)) + 
-  geom_point( aes(color=review_high)) +
-  #geom_point( color="#69b3a2") +
-  geom_smooth(method=lm, se=FALSE) +
+  #geom_point( aes(color=review_high), alpha = .5) +
+  geom_point( color="#69b3a2", alpha = .7) +
+  geom_smooth(method=lm, se=FALSE, color = "gray", size = 1.5) +
   scale_y_continuous(limits = c(0,100))+
   scale_x_continuous(limits = c(0,40))+
   theme_ipsum()+
@@ -472,7 +474,8 @@ df_ae %>% filter(!between(review_score,4.01,4.9))%>%
        subtitle = "Distância não tem relação com atraso",
        caption = "Em dias",
        color = "Review")+
-  theme_classic()
+  theme_classic()+
+  annotate(geom = "text", x = 35, y = 20, label = "Regressão linear")
   
 mean(df_ae$delay_expectation_time)
 
@@ -500,3 +503,4 @@ df_ae %>%
   ggplot(aes(product_category_name, fill = review_high)) +
   geom_bar(position = 'dodge')
 
+# Olhar relação de product description lenght e review
