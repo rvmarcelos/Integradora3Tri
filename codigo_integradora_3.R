@@ -17,17 +17,7 @@ library(geosphere)
 
 ## TO DOs -----
 
-# Analise Kmeans ok
-
-# Melhorar matrix correlaÃ§Ã£o...
-
-# Fazer Boxplots e outros grÃ¡ficos pertinentes...
-
-# Analise da distancia comprador e vendedor (usar lat lng)
-
-# Olhar se é possível ver o tempo entre pedidos
-
-#normalizar dados para kmeans!!!
+# Mexer nos slides
 
 
 # Tratar outliers
