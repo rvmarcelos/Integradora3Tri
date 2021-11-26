@@ -439,9 +439,9 @@ df_ae %>% filter(!between(review_score,4.01,4.9)) %>%
              color = "gray",
              size = 1.5,
              linetype = 2)+
-  scale_fill_brewer(palette = 'BrBG')+
-  annotate(geom = "text", x = 8, y = 6.5, label = "média atraso geral", color = "gray")+
-  annotate(geom = "text", x = 11, y = .9, label = "mediana atraso grupo")
+  scale_fill_brewer(palette = 'RdGy')+
+  annotate(geom = "text", x = 9, y = 6.5, label = "média atraso geral", color = "gray")+
+  annotate(geom = "text", x = 13, y = .9, label = "mediana atraso grupo") 
   
 
 
@@ -453,8 +453,8 @@ df_ae$review
 df_ae %>% filter(!between(review_score,4.01,4.9))%>% 
   ggplot(aes(x=distance, y=delay_expectation_time)) + 
   #geom_point( aes(color=review_high), alpha = .5) +
-  geom_point( color="#69b3a2", alpha = .7) +
-  geom_smooth(method=lm, se=FALSE, color = "gray", size = 1.5) +
+  geom_point( color="#A62B4D", alpha = .7) +
+  geom_smooth(method=lm, se=FALSE, color = "#414042", size = 1.5) +
   scale_y_continuous(limits = c(0,100))+
   scale_x_continuous(limits = c(0,40))+
   theme_ipsum()+
