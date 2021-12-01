@@ -17,6 +17,10 @@ library(geosphere)
 
 ## TO DOs -----
 
+# Olhar a recorrência dos usuários
+
+# Olhar relação com qualidade da photo do produto e descrição produto (nesta, olhar um tamanho ótimo de descrição, nem grande nem pequeno)
+
 # Mexer nos slides
 
 
@@ -123,7 +127,9 @@ df_ae <- df_olist %>%
   #Tratando NA de categorica com valor mais frequente
   mutate(across(where(is.character) & !starts_with("review"),~replace_na(.x, max(.x , na.rm = TRUE)))) %>% 
   # Tratando NA de continuas com media
-  mutate(across(where(is.numeric),~replace_na(.x, mean(.x , na.rm = TRUE))))
+  mutate(across(where(is.numeric),~replace_na(.x, mean(.x , na.rm = TRUE)))) %>% 
+  #Levando a review_score para ultima coluna
+  relocate(review_score, .after = last_col())
 
 # Distancia dois
 mutate(distance =  distm(c(customer_lng, customer_lat), c(seller_lng, seller_lat), fun = distHaversine)) %>%
@@ -299,6 +305,12 @@ correlacao <- cor(df_ae %>% select(where(is.numeric)))
 
 corrplot(correlacao, method = 'color', order = 'alphabet')
 
+cor_review <- data.frame(n = c(correlacao)) %>%
+  slice_tail(n = 26) %>%
+  mutate(variaveis = df_ae %>%select(where(is.numeric)) %>%colnames())
+
+cor_review %>% arrange(desc(n))
+
 df_ae$product_name_lenght
 
 df_ae %>% filter(!is.na(review_score)) %>% count(review_score)
@@ -412,12 +424,12 @@ df_cluster %>% group_by(cluster) %>%
             review = mean(review_score),
             mesmo_UF = mean(same_estate_cs))
 
-## Entrega parcial:  ----
-
-# Analises Review e Atraso: 
 
 
-# Atraso e Review
+
+
+
+# Atraso e Review------
 
 df_ae %>% filter(!between(review_score,4.01,4.9)) %>% 
   ggplot(aes(x = delay_expectation_time_2,
@@ -430,8 +442,7 @@ df_ae %>% filter(!between(review_score,4.01,4.9)) %>%
   #scale_y_discrete(limits = c(1,5))+
   labs(x = "Atraso do Produto",
        y = "Review",
-       title = "Análise do review pelo atraso",
-       subtitle = "Atrasos maiores levam à review piores",
+       
        caption = "Em dias")+
   theme_classic()+
   theme(legend.position = "none")+
@@ -444,11 +455,105 @@ df_ae %>% filter(!between(review_score,4.01,4.9)) %>%
   annotate(geom = "text", x = 13, y = .9, label = "mediana atraso grupo") 
   
 
+# Descrição / transparencia do produto e review-----
+
+df_ae %>% filter(!between(review_score,4.01,4.9)) %>% 
+  filter(product_category_name %in% descrição_grande) %>%
+  ggplot(aes(x = product_description_lenght,
+             y = factor(review_score), 
+             fill = as.factor(review_score))) +
+  geom_density_ridges(alpha=0.6, quantile_lines = TRUE, quantiles = 2) + 
+  theme(legend.position = "none")+
+  #scale_x_continuous(limits = c(0,4000))+
+  #scale_y_discrete(limits = c(1,5))+
+  labs(x = "Tamanho da descrição",
+       y = "Review",
+       title = "Análise do review pela descrição",
+       subtitle = "Sem conclusão",
+       caption = "Em número de palavras")+
+  theme_classic()+
+  theme(legend.position = "none")+
+  geom_vline(xintercept = mean(df_ae$product_description_lenght),color = "gray",size = 1,linetype = 2)+
+  scale_fill_brewer(palette = 'RdGy')+
+  #annotate(geom = "text", x = 1250, y = 6.5, label = "média atraso geral", color = "gray")+
+  annotate(geom = "text", x = 300, y = .9, label = "mediana atraso grupo") 
+
+
+#procura de filtro por categoria
+
+descrição_grande <- df_ae %>%
+  filter(review_score == 1) %>% 
+  group_by(product_category_name) %>% 
+  summarise(
+            #nota = mean(review_score),
+            descricao_media = mean(product_description_lenght),
+            descricao_var = sd(product_description_lenght),
+            receita = sum(payment_value)) %>% 
+  arrange(desc(descricao_media)) %>% 
+  pull(product_category_name) %>% 
+  head(10)
 
 
 
-df_ae$review
-# Distancia por tempo de atraso
+
+# filtro de produto de informatica
+
+df_ae %>% filter(!between(review_score,4.01,4.9)) %>% filter(product_category_name == "informatica_acessorios") %>% 
+  ggplot(aes(x = product_description_lenght,
+             y = factor(review_score), 
+             fill = as.factor(review_score))) +
+  geom_density_ridges(alpha=0.6, quantile_lines = TRUE, quantiles = 2) + 
+  theme(legend.position = "none")+
+  scale_x_continuous(limits = c(0,4000))+
+  #scale_y_discrete(limits = c(1,5))+
+  labs(x = "Tamanho da descrição",
+       y = "Review",
+       title = "Análise do review pela descrição",
+       subtitle = "Sem conclusão",
+       caption = "Em número de palavras")+
+  theme_classic()+
+  theme(legend.position = "none")+
+  #geom_vline(xintercept = mean(df_ae$product_description_lenght),color = "gray",size = 1.5,linetype = 2)+
+  scale_fill_brewer(palette = 'RdGy')+
+  #annotate(geom = "text", x = 1250, y = 6.5, label = "média atraso geral", color = "gray")+
+  annotate(geom = "text", x = 300, y = .9, label = "mediana atraso grupo") 
+
+
+# qualidade da foto
+
+df_ae %>% filter(!between(review_score,4.01,4.9)) %>% 
+  ggplot(aes(x = product_photos_qty,
+             y = factor(review_score), 
+             fill = as.factor(review_score))) +
+  geom_density_ridges(alpha=0.6, quantile_lines = TRUE, quantiles = 2) + 
+  theme(legend.position = "none")+
+  scale_x_continuous(limits = c(0,10))+
+  #scale_y_discrete(limits = c(1,5))+
+  labs(x = "Qualidade da foto",
+       y = "Review",
+       title = "Análise do review pela descrição",
+       subtitle = "Sem conclusão",
+       caption = "Em número de palavras")+
+  theme_classic()+
+  theme(legend.position = "none")+
+  #geom_vline(xintercept = mean(df_ae$product_description_lenght),color = "gray",size = 1.5,linetype = 2)+
+  scale_fill_brewer(palette = 'RdGy')+
+  #annotate(geom = "text", x = 1250, y = 6.5, label = "média atraso geral", color = "gray")+
+  annotate(geom = "text", x = 300, y = .9, label = "mediana atraso grupo") 
+
+df_ae %>% filter(!between(review_score,4.01,4.9)) %>% 
+  ggplot( aes(x=factor(review_score), y=product_photos_qty, fill=factor(review_score))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = 'RdGy')+
+  labs(x = "Review",
+       y = "Qualidade das foto",
+       title = "Análise do review pela descrição",
+       subtitle = "Sem conclusão",
+       caption = "Em número de palavras")+
+  theme_classic()+
+  theme(legend.position = "none")
+
+# Distancia por tempo de atraso-----
 
 df_ae %>% filter(!between(review_score,4.01,4.9))%>% 
   ggplot(aes(x=distance, y=delay_expectation_time)) + 
@@ -473,7 +578,7 @@ mean(df_ae$distance)
 
 df_ae %>% filter(!between(review_score,4.01,4.9))%>% count(review_score)
 
-# Categoria de produto e review
+# Categoria de produto e review-------
 
 df_receita %>% glimpse()
 
@@ -493,4 +598,28 @@ df_ae %>%
   ggplot(aes(product_category_name, fill = review_high)) +
   geom_bar(position = 'dodge')
 
-# Olhar relação de product description lenght e review
+df_ae %>% count(customer_id) %>% arrange(desc(n)) %>% head()
+  
+
+# Analise de recorrencia------
+
+recompra <- orders %>%
+  count(customer_id) %>%
+  arrange(desc(n)) %>%
+  filter(n >= 2) %>%
+  pull(customer_id)
+
+df_ocor <- df_ae %>% 
+  mutate(churn = ifelse(customer_id %in% recompra, 1, 0)) 
+
+df_ocor %>% 
+  ggplot(aes(factor(review_score), fill = factor(churn)))+
+  geom_bar(position = 'dodge')
+
+df_ocor %>% count(churn)
+
+cor(x = df_ocor$churn, y = df_ocor$review_score)
+
+cor(x = factor(df_ae$review_score), y = ifelse(df_ae$payment_type == ""))
+
+df_ae %>% count(order_id) %>% arrange(desc(n)) %>% head()
