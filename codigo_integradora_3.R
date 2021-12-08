@@ -43,7 +43,12 @@ orders <- read.csv('olist_orders_dataset.csv')
 
 payments <- read.csv('olist_order_payments_dataset.csv')
 
-item <- read.csv('olist_order_items_dataset.csv')
+#tomar cuidado, revisar sum
+item <- read.csv('olist_order_items_dataset.csv') %>% 
+  group_by(order_id) %>% 
+  summarise(across(c(product_id,seller_id, shipping_limit_date   ), first), 
+            price = sum(price),
+            freight_value = sum(freight_value ))
 
 geolocalization <- read.csv('olist_geolocation_dataset.csv')
 
@@ -447,12 +452,13 @@ df_ae %>% filter(!between(review_score,4.01,4.9)) %>%
   theme_classic()+
   theme(legend.position = "none")+
   geom_vline(xintercept = mean(df_ae$delay_expectation_time_2),
-             color = "gray",
-             size = 1.5,
+             color = "#595959",
+             size = 1,
              linetype = 2)+
   scale_fill_brewer(palette = 'RdGy')+
-  annotate(geom = "text", x = 9, y = 6.5, label = "média atraso geral", color = "gray")+
-  annotate(geom = "text", x = 13, y = .9, label = "mediana atraso grupo") 
+  annotate(geom = "text", x = 9, y = 6.7, label = "média atraso geral")+
+  annotate(geom = "text", x = 13, y = .9, label = "mediana atraso grupo")
+  #scale_fill_manual()
   
 
 # Descrição / transparencia do produto e review-----
@@ -565,8 +571,6 @@ df_ae %>% filter(!between(review_score,4.01,4.9))%>%
   theme_ipsum()+
   labs(x = "Distancia Customer e Seller",
        y = "Atraso",
-       title = "Atraso pela distância",
-       subtitle = "Distância não tem relação com atraso",
        caption = "Em dias",
        color = "Review")+
   theme_classic()+
@@ -623,3 +627,5 @@ cor(x = df_ocor$churn, y = df_ocor$review_score)
 cor(x = factor(df_ae$review_score), y = ifelse(df_ae$payment_type == ""))
 
 df_ae %>% count(order_id) %>% arrange(desc(n)) %>% head()
+
+janitor::get_dupes(item, "order_id") %>% glimpse()
