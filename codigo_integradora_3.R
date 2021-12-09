@@ -629,3 +629,19 @@ cor(x = factor(df_ae$review_score), y = ifelse(df_ae$payment_type == ""))
 df_ae %>% count(order_id) %>% arrange(desc(n)) %>% head()
 
 janitor::get_dupes(item, "order_id") %>% glimpse()
+
+## Analise do TAM ------
+
+df_ae %>% 
+  filter(review_high == "high") %>% 
+  summarise(
+    nota_média = mean(review_score),
+    ticket_medio = mean(payment_value),
+    delivery = mean(delivery_time)
+    )
+
+df_ae %>% filter(review_high=="low")
+
+recompra <- .6
+
+count(df_ae %>% filter(review_high=="low"))*recompra*mean(df_ae$payment_value)
